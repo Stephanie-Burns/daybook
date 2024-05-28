@@ -94,12 +94,12 @@ daybook --date YYYY-MM-DD
 
 ## Configuration ⚙️
 ### Directory Structure
-By default, the journal entries are stored in ~/daybook. You can change this by setting the JOURNAL_DIR environment variable.
+By default, the journal entries are stored in ~/daybook-entries. You can change this by setting the JOURNAL_DIR environment variable.
 
 Files
-- **Template File**: ~/daybook/templates/template.md
-- **Table of Contents**: ~/daybook/table_of_contents.md
-- **Encryption Key**: ~/daybook/secret.key
+- **Template File**: ~/daybook-entries/templates/template.md
+- **Table of Contents**: ~/daybook-entries/table_of_contents.md
+- **Encryption Key**: ~/daybook-entries/secret.key
 
 ### Template File
 The template file should contain placeholders for the date and title:

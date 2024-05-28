@@ -5,7 +5,7 @@ import tempfile
 import shutil
 import datetime
 
-from daybook import CryptoManager, DaybookManager
+from src.daybook.daybook import CryptoManager, DaybookManager
 
 
 class TestDaybook(unittest.TestCase):

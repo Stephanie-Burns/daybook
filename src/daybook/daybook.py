@@ -8,10 +8,21 @@ from cryptography.fernet import Fernet
 import argparse
 from typing import Optional, Tuple
 
-DAYBOOK_DIR = Path(os.getenv('DAYBOOK_DIR', Path.home() / 'daybook'))
+DAYBOOK_DIR = Path(os.getenv('DAYBOOK_DIR', Path.home() / 'daybook-entries'))
 TEMPLATE_FILE = DAYBOOK_DIR / 'templates/template.md'
 TOC_FILE = DAYBOOK_DIR / 'table_of_contents.md'
 KEY_FILE = DAYBOOK_DIR / 'secret.key'
+
+DEFAULT_TEMPLATE = """# Journal Entry for {{date}}
+
+## Title: {{title}}
+
+## Highlights
+- 
+
+## Notes
+- 
+"""
 
 
 class CryptoManager:
@@ -26,6 +37,7 @@ class CryptoManager:
     def generate_key(self) -> None:
         """Generate a new encryption key and save it to the specified key file."""
         key = Fernet.generate_key()
+
         with open(self.key_file, 'wb') as kf:
             kf.write(key)
 
@@ -53,7 +65,6 @@ class CryptoManager:
 
             with open(file_path, 'rb') as enc_file:
                 encrypted = enc_file.read()
-
             decrypted = fernet.decrypt(encrypted)
 
             with open(file_path, 'wb') as dec_file:
@@ -64,11 +75,48 @@ class CryptoManager:
 
 
 class DaybookManager:
-    def __init__(self, daybook_dir: Path = DAYBOOK_DIR, template_file: Path = TEMPLATE_FILE, toc_file: Path = TOC_FILE, crypto_manager: Optional[CryptoManager] = None):
+    def __init__(
+            self,
+            daybook_dir: Path = DAYBOOK_DIR,
+            template_file: Path = TEMPLATE_FILE,
+            toc_file: Path = TOC_FILE,
+            crypto_manager: Optional[CryptoManager] = None
+    ):
         self.daybook_dir = daybook_dir
         self.template_file = template_file
         self.toc_file = toc_file
+
         self.crypto_manager = crypto_manager if crypto_manager else CryptoManager()
+
+        # Ensure the daybook directory and necessary subdirectories exist
+        self.setup_directories_and_files()
+
+    def setup_directories_and_files(self) -> None:
+        """Set up the necessary directories and files for the daybook."""
+        self.daybook_dir.mkdir(parents=True, exist_ok=True)
+        self.template_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if not self.template_file.exists():
+            self.copy_default_template()
+
+        self.create_gitignore()
+
+    def copy_default_template(self) -> None:
+        """Copy the default template from the application directory."""
+        try:
+            with open(self.template_file, 'w') as dst:
+                dst.write(DEFAULT_TEMPLATE)
+
+        except Exception as e:
+            print(f"Error writing default template: {e}", file=sys.stderr)
+
+    def create_gitignore(self) -> None:
+        """Create a .gitignore file to ignore the secret.key."""
+        gitignore_file = self.daybook_dir / '.gitignore'
+
+        if not gitignore_file.exists():
+            with open(gitignore_file, 'w') as f:
+                f.write('secret.key\n')
 
     def get_today_file(self) -> Tuple[Path, Path]:
         """Get the file path and directory for today's daybook entry."""
@@ -104,23 +152,26 @@ class DaybookManager:
         try:
             relative_path = today_file.relative_to(self.daybook_dir)
             new_entry = f'- [{date_str}]({relative_path}){" - " + title if title else ""}\n'
+            toc_entries = []
 
-            # Create a dictionary to store existing entries
-            toc_entries = {}
             if self.toc_file.exists():
                 with open(self.toc_file, 'r') as toc:
-                    for line in toc:
-                        if line.startswith('- ['):
-                            entry_date = line.split(']')[0][2:]
-                            toc_entries[entry_date] = line
+                    toc_entries = toc.readlines()
 
-            # Update or add the new entry
-            toc_entries[date_str] = new_entry
+            # Check if an entry with the same date already exists
+            entry_exists = False
 
-            # Write updated entries back to the TOC file
+            for i, line in enumerate(toc_entries):
+                if line.startswith(f'- [{date_str}]'):
+                    toc_entries[i] = new_entry
+                    entry_exists = True
+                    break
+
+            if not entry_exists:
+                toc_entries.append(new_entry)
+
             with open(self.toc_file, 'w') as toc:
-                for entry in sorted(toc_entries.values()):
-                    toc.write(entry)
+                toc.writelines(toc_entries)
 
         except Exception as e:
             print(f"Error updating table of contents: {e}", file=sys.stderr)
@@ -150,7 +201,6 @@ class DaybookManager:
 
             if today_file.exists():
                 self.crypto_manager.decrypt_file(today_file)
-
             year_month_dir.mkdir(parents=True, exist_ok=True)
 
             if not today_file.exists():
@@ -177,7 +227,6 @@ class DaybookManager:
 
         editor = os.getenv('EDITOR', 'vim')
         os.system(f'{editor} {file_path}')
-
         title = self.extract_title(file_path)
 
         try:
@@ -195,7 +244,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Daybook Manager")
     parser.add_argument('--date', type=str, help='Date of the daybook entry to read (format: YYYY-MM-DD)')
     args = parser.parse_args()
-
     daybook_manager = DaybookManager()
 
     if args.date:
