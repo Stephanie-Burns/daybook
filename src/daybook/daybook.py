@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import sys
 import datetime
@@ -37,6 +36,7 @@ class CryptoManager:
     def generate_key(self) -> None:
         """Generate a new encryption key and save it to the specified key file."""
         key = Fernet.generate_key()
+        self.key_file.parent.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
 
         with open(self.key_file, 'wb') as kf:
             kf.write(key)
